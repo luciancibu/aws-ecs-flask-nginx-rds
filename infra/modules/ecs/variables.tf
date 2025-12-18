@@ -45,6 +45,10 @@ variable "db_name" {
   type = string
 }
 
+variable "db_port" {
+  type = string
+}
+
 variable "private_subnets" {
   type = list(string)
 }

@@ -98,10 +98,12 @@ module "ecs" {
   # forntend
   ecr_frontend_repository_url = module.ecr_frontend.repository_url
   frontend_tg_arn              = module.alb.frontend_tg_arn
-    
+
   db_host     = module.rds.endpoint
   db_user     = module.rds.username
   db_password = module.rds.password
   db_name     = module.rds.db_name
+  db_port     = module.rds.port
+
   
 }

@@ -102,6 +102,10 @@ resource "aws_ecs_task_definition" "backend" {
           value = var.db_host
         },
         {
+          name  = "DB_PORT"
+          value = var.db_port
+        },        
+        {
           name  = "DB_USER"
           value = var.db_user
         },
