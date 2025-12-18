@@ -204,3 +204,14 @@ resource "aws_ecs_service" "frontend" {
     container_port   = 80
   }
 }
+
+resource "aws_cloudwatch_log_group" "backend" {
+  name              = "/ecs/${var.name}-backend"
+  retention_in_days = 7 # delete logs after 7 days
+}
+
+resource "aws_cloudwatch_log_group" "frontend" {
+  name              = "/ecs/${var.name}-frontend"
+  retention_in_days = 7 # delete logs after 7 days
+}
+
