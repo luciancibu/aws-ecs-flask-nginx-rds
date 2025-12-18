@@ -5,5 +5,5 @@
 *.txt
 *.exe
 *.backup
-*.md
 !backend/requirements.txt
+
