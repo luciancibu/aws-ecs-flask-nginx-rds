@@ -77,17 +77,7 @@ resource "aws_security_group" "ecs_sg" {
   vpc_id = var.vpc_id
 }
 #   3.1 Ingress: from ALB
-resource "aws_security_group_rule" "ecs_ingress" {
-  count = var.allowed_sg_id == null ? 0 : 1
-  security_group_id        = aws_security_group.ecs_sg.id
-
-  description              = "Access from ALB-sg"
-  type                     = "ingress"
-  from_port                = 5000
-  to_port                  = 5000
-  protocol                 = "tcp"
-  source_security_group_id = var.allowed_sg_id
-}
+# /end/dev/main.tf --> cycle error
 
 #   3.2 Egress: allow all
 resource "aws_security_group_rule" "ecs_egress" {

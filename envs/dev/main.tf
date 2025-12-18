@@ -12,27 +12,22 @@ resource "aws_security_group_rule" "rds_ingress_from_ecs" {
   source_security_group_id = module.ecs.ecs_sg_id
 }
 
-# resource "aws_security_group_rule" "ecs_ingress" {
-#   security_group_id        = module.ecs_sg.ecs_sg_id
+resource "aws_security_group_rule" "ecs_ingress" {
+  security_group_id        = module.ecs.ecs_sg_id
 
-#   type                     = "ingress"
-#   from_port                = 5000
-#   to_port                  = 5000
-#   protocol                 = "tcp"
-#   source_security_group_id = var.allowed_sg_id
-# }
+  description              = "Access from ALB-sg"
+  type                     = "ingress"
+  from_port                = 5000
+  to_port                  = 5000
+  protocol                 = "tcp"
+  source_security_group_id = module.alb.alb_sg_id
+}
 
-
-#############################
-#############################
-#############################  ECR
+#  ECR
 resource "aws_ecr_repository" "backend" {
   name = "backend-flask"
 }
 
-#############################
-#############################
-#############################
 module "vpc" {
   source = "../../modules/vpc"
 
@@ -80,4 +75,14 @@ module "ecs" {
   db_name     = module.rds.db_name
   private_subnets = module.vpc.private_subnets
 }
+
+module "alb" {
+  source = "../../modules/alb"
+
+  name               = "dev-ALB"
+  vpc_id             = module.vpc.vpc_id
+  public_subnets = module.vpc.public_subnets
+
+}
+
 
