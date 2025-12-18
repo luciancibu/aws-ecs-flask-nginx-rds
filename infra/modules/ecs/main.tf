@@ -77,7 +77,7 @@ resource "aws_security_group" "ecs_sg" {
   vpc_id = var.vpc_id
 }
 #   3.1 Ingress: from ALB
-# /end/dev/main.tf --> cycle error
+# /infra/env/dev/main.tf --> cycle error
 
 #   3.2 Egress: allow all
 resource "aws_security_group_rule" "ecs_egress" {
