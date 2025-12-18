@@ -1,0 +1,7 @@
+*.hcl
+*.info
+*.tfstate
+*.json
+*.txt
+*.exe
+*.md
