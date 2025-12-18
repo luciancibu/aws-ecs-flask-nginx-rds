@@ -1,7 +1,7 @@
 # Cyclic dependency: each group will be created in its specific module,
 # but the security rules between them will be defined here
 
-
+# ECS -> RDS
 resource "aws_security_group_rule" "rds_ingress_from_ecs" {
   security_group_id        = module.rds.rds_sg_id
 
@@ -12,10 +12,9 @@ resource "aws_security_group_rule" "rds_ingress_from_ecs" {
   source_security_group_id = module.ecs.ecs_sg_id
 }
 
-resource "aws_security_group_rule" "ecs_ingress" {
+# ALB -> Backend
+resource "aws_security_group_rule" "ecs_backend_ingress" {
   security_group_id        = module.ecs.ecs_sg_id
-
-  description              = "Access from ALB-sg"
   type                     = "ingress"
   from_port                = 5000
   to_port                  = 5000
@@ -23,9 +22,14 @@ resource "aws_security_group_rule" "ecs_ingress" {
   source_security_group_id = module.alb.alb_sg_id
 }
 
-#  ECR
-resource "aws_ecr_repository" "backend" {
-  name = "backend-flask"
+# ALB -> Frontend
+resource "aws_security_group_rule" "ecs_frontend_ingress" {
+  security_group_id        = module.ecs.ecs_sg_id
+  type                     = "ingress"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  source_security_group_id = module.alb.alb_sg_id
 }
 
 module "vpc" {
@@ -60,20 +64,14 @@ module "rds" {
   name ="rds"
 }
 
-module "ecs" {
-  source = "../../modules/ecs"
+module "ecr_backend" {
+  source = "../../modules/ecr"
+  name   = "backend-flask"
+}
 
-  name               = "dev-backend"
-  vpc_id             = module.vpc.vpc_id
-  aws_region         = var.aws_region
-  ecr_repository_url = aws_ecr_repository.backend.repository_url
-
-
-  db_host     = module.rds.endpoint
-  db_user     = module.rds.username
-  db_password = module.rds.password
-  db_name     = module.rds.db_name
-  private_subnets = module.vpc.private_subnets
+module "ecr_frontend" {
+  source = "../../modules/ecr"
+  name   = "frontend-nginx"
 }
 
 module "alb" {
@@ -85,4 +83,25 @@ module "alb" {
 
 }
 
+module "ecs" {
+  source = "../../modules/ecs"
 
+  name               = "dev-backend"
+  vpc_id             = module.vpc.vpc_id
+  aws_region         = var.aws_region
+  private_subnets = module.vpc.private_subnets
+
+  # backend
+  ecr_repository_url = module.ecr_backend.repository_url
+  backend_tg_arn = module.alb.backend_tg_arn
+
+  # forntend
+  ecr_frontend_repository_url = module.ecr_frontend.repository_url
+  frontend_tg_arn              = module.alb.frontend_tg_arn
+    
+  db_host     = module.rds.endpoint
+  db_user     = module.rds.username
+  db_password = module.rds.password
+  db_name     = module.rds.db_name
+  
+}

@@ -1,35 +1,17 @@
 # 1. IAM Roles
-#   1.1 Task execution role
-#   1.2 Task role
-
 # 2. ECS Cluster
-
 # 3. Security Group for ECS backend
-#   3.1 Ingress: from ALB
-#   3.2 Egress: allow all
-
 # 4. ECS Task Definition (backend)
-#   4.1 Container image (ECR)
-#   4.2 CPU / Memory
-#   4.3 Environment variables
-#   4.4 Port mappings
-#   4.5 Log configuration (CloudWatch)
-
-# 5. ECS Service (backend)
-#   5.1 Launch type: Fargate
-#   5.2 Network configuration (private subnets)
-#   5.3 Security groups
-#   5.4 Desired count
-#   5.5 Load balancer attachment (to be added later)
-
-# 6. Outputs
-#   6.1 Backend security group ID
-#   6.2 Service name
-#   6.3 Cluster name
+#   4.1. ECS Service (backend)
+#   4.2 Load balancer attachment (backend)
+# 5. ECS Task Definition (frontend)
+#   5.1. ECS Service (frontend)
+#   5.2 Load balancer attachment (frontend)
+# 7. Outputs
 
 
 # 1. IAM Roles
-#   1.1 Task execution role  -> used by ECS agent for pull image from ECR, CloudWatch logs etc
+# Task execution role  -> used by ECS agent for pull image from ECR, CloudWatch logs etc
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "${var.name}-ecs-task-execution-role"
 
@@ -50,7 +32,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-#   1.2 Task role  -> used by my app/container. Used for access to RDS, S3, Secret Manager etc
+# Task role  -> used by my app/container. Used for access to RDS, S3, Secret Manager etc
 resource "aws_iam_role" "ecs_task_role" {
   name = "${var.name}-ecs-task-role"
 
@@ -76,10 +58,7 @@ resource "aws_security_group" "ecs_sg" {
   name   = "${var.name}-sg"
   vpc_id = var.vpc_id
 }
-#   3.1 Ingress: from ALB
-# /infra/env/dev/main.tf --> cycle error
 
-#   3.2 Egress: allow all
 resource "aws_security_group_rule" "ecs_egress" {
   security_group_id = aws_security_group.ecs_sg.id
   type              = "egress"
@@ -95,7 +74,6 @@ resource "aws_ecs_task_definition" "backend" {
   network_mode             = "awsvpc"       # each task will have ENI in subnet (private IP from subnet) -> SG will be attached to ENI task
   requires_compatibilities = ["FARGATE"]    # serverless runtime
 
-#   4.2 CPU / Memory
   cpu    = "256" 
   memory = "512"
 
@@ -105,13 +83,11 @@ resource "aws_ecs_task_definition" "backend" {
   container_definitions = jsonencode([                           # ECS API needs json => jsoncode
     {
 
-#   4.1 Container image (ECR)
       name  = "backend"
       image = "${var.ecr_repository_url}:latest" # ecr image -> latest
 
       essential = true # if this task crashed => ecs will see it as failed => restart
 
-#   4.4 Port mappings
       portMappings = [
         {
           containerPort = var.container_port  # for awsvpc -> hostPort is the same as containerPort. So, if the app listens on port 5000, it should be 5000 here
@@ -119,7 +95,6 @@ resource "aws_ecs_task_definition" "backend" {
         }
       ]
 
-#   4.3 Environment variables
       # ECS injects these variables into the container when it starts
       environment = [   
         {
@@ -139,7 +114,6 @@ resource "aws_ecs_task_definition" "backend" {
           value = var.db_name
         }
       ]
-#   4.5 Log configuration (CloudWatch)
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -152,24 +126,81 @@ resource "aws_ecs_task_definition" "backend" {
   ])
 }
 
-# 5. ECS Service (backend)
+# 4.1. ECS Service (backend)
 resource "aws_ecs_service" "backend" {
   name            = "${var.name}-backend"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.backend.arn
-#   5.4 Desired count
   desired_count   = 1 # number of tasks to run permanently
 
-#   5.1 Launch type: Fargate
   launch_type = "FARGATE"
 
-#   5.2 Network configuration
-#   5.3 Security groups
   network_configuration {
     subnets         = var.private_subnets
     security_groups = [aws_security_group.ecs_sg.id]
     assign_public_ip = false
   }
+# 4.2 Load balancer attachment (backend)
+  load_balancer {
+    target_group_arn = var.backend_tg_arn
+    container_name   = "backend"
+    container_port   = var.container_port
+  }
+
 }
 
-#   5.5 Load balancer attachment (to be added later) -> to be added
+# 5. ECS Task Definition (frontend)
+resource "aws_ecs_task_definition" "frontend" {
+  family                   = "${var.name}-frontend"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu    = "256"
+  memory = "512"
+
+  execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "frontend"
+      image = "${var.ecr_frontend_repository_url}:latest"
+
+      portMappings = [
+        {
+          containerPort = 80
+        }
+      ]
+
+      essential = true
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/${var.name}-frontend"
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+}
+
+#   5.1. ECS Service (frontend)
+resource "aws_ecs_service" "frontend" {
+  name            = "${var.name}-frontend"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.frontend.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = var.private_subnets
+    security_groups = [aws_security_group.ecs_sg.id]
+    assign_public_ip = false
+  }
+# 5.2 Load balancer attachment (backend)
+  load_balancer {
+    target_group_arn = var.frontend_tg_arn
+    container_name   = "frontend"
+    container_port   = 80
+  }
+}

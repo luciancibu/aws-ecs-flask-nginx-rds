@@ -19,6 +19,10 @@ variable "ecr_repository_url" {
   type = string
 }
 
+variable "ecr_frontend_repository_url" {
+  type = string
+}
+
 variable "container_port" {
   type    = number
   default = 5000
@@ -43,4 +47,10 @@ variable "db_name" {
 
 variable "private_subnets" {
   type = list(string)
+}
+
+variable "backend_tg_arn" {
+}
+
+variable "frontend_tg_arn" {
 }
