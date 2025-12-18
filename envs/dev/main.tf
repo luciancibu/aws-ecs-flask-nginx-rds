@@ -19,3 +19,12 @@ module "vpc" {
     "us-east-1b"
   ]
 }
+
+module "rds" {
+  source = "../../modules/rds"
+
+  vpc_id          = module.vpc.vpc_id
+  private_subnets = module.vpc.private_subnets
+  username = "bbbb"
+  password = "SuperPass123"
+}
