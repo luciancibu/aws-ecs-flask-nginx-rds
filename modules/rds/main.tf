@@ -12,30 +12,18 @@
 
 # 1. DB subnet group (private subnets only)
 resource "aws_db_subnet_group" "this" {
-  name       = "rds-private-subnets"
+  name       = "${var.name}-subnets-group"
   subnet_ids = var.private_subnets
 
   tags = {
-    Name = "rds-private-subnets"
+    Name = "${var.name}-subnets-group"
   }
 }
 
 # 2. Security group for RDS
 resource "aws_security_group" "rds_sg" {
-  name   = "rds-sg"
+  name   = "${var.name}-sg"
   vpc_id = var.vpc_id
-}
-
-# 2.1 Ingress: DB port (from ECS backend)
-resource "aws_security_group_rule" "rds_ingress" {
-  count = var.allowed_sg_id == null ? 0 : 1
-
-  security_group_id        = aws_security_group.rds_sg.id
-  type                     = "ingress"
-  from_port                = 3306
-  to_port                  = 3306
-  protocol                 = "tcp"
-  source_security_group_id = var.allowed_sg_id
 }
 
 # 2.2 Egress: all
@@ -53,8 +41,8 @@ resource "aws_security_group_rule" "rds_egress" {
 #   3.2 Network (subnet group + SG)
 #   3.3 Credentials
 resource "aws_db_instance" "mysql" {
-  identifier = "backend-mysql"
-  allocated_storage    = 10
+  identifier = "${var.name}-database"
+  allocated_storage    = var.allocated_storage
   db_name              = var.db_name
   engine               = var.engine
   engine_version       = var.engine_version

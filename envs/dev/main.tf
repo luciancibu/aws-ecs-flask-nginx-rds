@@ -1,3 +1,38 @@
+# Cyclic dependency: each group will be created in its specific module,
+# but the security rules between them will be defined here
+
+
+resource "aws_security_group_rule" "rds_ingress_from_ecs" {
+  security_group_id        = module.rds.rds_sg_id
+
+  type                     = "ingress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  source_security_group_id = module.ecs.ecs_sg_id
+}
+
+# resource "aws_security_group_rule" "ecs_ingress" {
+#   security_group_id        = module.ecs_sg.ecs_sg_id
+
+#   type                     = "ingress"
+#   from_port                = 5000
+#   to_port                  = 5000
+#   protocol                 = "tcp"
+#   source_security_group_id = var.allowed_sg_id
+# }
+
+
+#############################
+#############################
+#############################  ECR
+resource "aws_ecr_repository" "backend" {
+  name = "backend-flask"
+}
+
+#############################
+#############################
+#############################
 module "vpc" {
   source = "../../modules/vpc"
 
@@ -27,4 +62,22 @@ module "rds" {
   private_subnets = module.vpc.private_subnets
   username = "bbbb"
   password = "SuperPass123"
+  name ="rds"
 }
+
+module "ecs" {
+  source = "../../modules/ecs"
+
+  name               = "dev-backend"
+  vpc_id             = module.vpc.vpc_id
+  aws_region         = var.aws_region
+  ecr_repository_url = aws_ecr_repository.backend.repository_url
+
+
+  db_host     = module.rds.endpoint
+  db_user     = module.rds.username
+  db_password = module.rds.password
+  db_name     = module.rds.db_name
+  private_subnets = module.vpc.private_subnets
+}
+
